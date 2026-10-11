@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>逐流 · 撮合实验室</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='replay.css') }}">
+  <script defer src="{{ url_for('static', filename='replay.js') }}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-icon">≋</span> 逐流 <span class="brand-sub">MATCHING LAB</span></a>
+    <div class="header-links"><a href="/">原始数据浏览</a><a href="/backtest">因子回测</a><span class="mode"><i></i> 研究型模拟 · 非实盘</span></div>
+  </header>
+  <main class="lab">
+    <section class="lab-heading"><div><div class="eyebrow">COUNTERFACTUAL REPLAY / 逐笔撮合实验</div><h1>在每一笔之间，观察变化<span>。</span></h1></div><span id="session-badge" class="badge">未加载</span></section>
+    <details class="model-note" open>
+      <summary>模型边界与已确认的字段映射</summary>
+      <p>单证券空簿起步，全部新增均按限价单、价格优先 / 同价 FIFO 连续撮合；成交价取被动单价格。最小价位 0.01。不复原集合竞价、市价单、涨跌停和真实历史盘口，不使用 exe/snp 校准；注入后历史订单不会响应模拟冲击。</p>
+      <p>66 / 83 → 买 / 卖；OrderKind 65 / 68 → 新增 / 按 Volume 撤减；订单标识为 Channel + OrderOriNo。OrderKind 83 只提示阶段。缺失或过量撤减会记录警告；后者最多撤掉剩余量。时间相同的历史事件先于新注入事件。</p>
+    </details>
+    <form id="source-form" class="source-form">
+      <label>历史委托文件<select id="source-file" required><option value="__demo__">内置演示 · 6 笔示例，非真实数据</option></select></label>
+      <label>证券代码<input id="source-symbol" value="601688" pattern="[0-9]{6}" maxlength="6" required inputmode="numeric"></label>
+      <label>起始时间<input id="source-start" type="time" step="0.001" value="09:30:00.000" required></label>
+      <label>结束时间<input id="source-end" type="time" step="0.001" value="10:00:00.000" required></label>
+      <label class="confirm-model"><input id="mapping-confirmed" type="checkbox" required>确认以上映射与简化规则</label>
+      <button class="button primary" type="submit" id="load-session">加载 / 重置实验</button>
+    </form>
+    <div id="lab-status" role="status" aria-live="polite">请选择数据区间并加载。重置只清空本标签页的实验，不修改源文件。</div>
+    <section class="playbar" aria-label="回放控制">
+      <div class="play-actions"><button id="step" class="button secondary" disabled>下一事件</button><button id="play" class="button primary" disabled>▶ 连续回放</button><label>速度 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="5">5×</option><option value="10">10×</option><option value="50">50×</option><option value="100">100×</option></select></label></div>
+      <div class="clock"><span>模拟时钟</span><strong id="market-time">--:--:--.---</strong></div>
+      <div class="progress-info"><span id="history-progress">历史事件 0 / 0</span><progress id="progress" value="0" max="1"></progress></div>
+    </section>
+    <section class="lab-metrics" aria-label="模拟统计">
+      <div><span>累计撮合成交</span><strong id="trade-count">0</strong></div>
+      <div><span>累计成交量</span><strong id="trade-volume">0</strong></div>
+      <div><span>活跃挂单</span><strong id="active-count">0</strong></div>
+      <div><span>待处理事件</span><strong id="pending-count">0</strong></div>
+      <div><span>累计数据警告</span><strong id="warning-count">0</strong></div>
+    </section>
+    <section class="lab-upper">
+      <article class="lab-pane events-pane"><div class="pane-heading"><h2>委托事件流</h2><span>历史与模拟 · 最近 200 条</span></div><div class="flow-scroll"><table id="event-table"><thead><tr><th>时间 / 来源</th><th>委托标识</th><th>事件</th><th>方向</th><th>价格</th><th>数量</th><th>提示</th></tr></thead><tbody></tbody></table></div></article>
+      <article class="lab-pane depth-pane"><div class="pane-heading"><h2>十档模拟盘口</h2><span>红买 / 绿卖</span></div><div class="depth-label"><span>档位</span><span>价格</span><span>挂单数量</span></div><div id="ask-depth"></div><div class="last-price"><span>最新模拟成交</span><strong id="last-price">—</strong></div><div id="bid-depth"></div></article>
+      <article class="lab-pane inject-pane"><div class="pane-heading"><h2>注入模拟委托</h2><span>独立 S: 标识</span></div>
+        <form id="inject-form">
+          <div class="form-pair"><label>方向<select id="inject-side"><option value="B">买入 B</option><option value="S">卖出 S</option></select></label><label>模式<select id="inject-mode"><option value="single">单笔限价</option><option value="split">定时拆单</option><option value="iceberg">冰山补单</option></select></label></div>
+          <div class="form-pair"><label>限价<input id="inject-price" type="number" min="0.01" max="10000000" step="0.01" value="18.48" required></label><label>总委托量<input id="inject-volume" type="number" min="1" max="1000000000" step="1" value="5000" required></label></div>
+          <div class="form-pair"><label id="clip-label" hidden>子单 / 展示量<input id="inject-clip" type="number" min="1" step="1" value="1000"></label><label id="interval-label" hidden>拆单间隔 (ms)<input id="inject-interval" type="number" min="1" step="1" value="1000"></label></div>
+          <label>延迟提交 (模拟毫秒)<input id="inject-delay" type="number" min="0" max="86399999" step="1" value="0" required></label>
+          <p id="strategy-help">在当前模拟时钟提交限价单。可挂在对手盘侧，或用可成交价格观察扫档。</p>
+          <button id="inject-submit" class="button primary" type="submit" disabled>注入并撮合 →</button>
+        </form>
+        <div class="scheduled"><h3>待提交模拟子单</h3><div id="scheduled-list"><span class="muted">暂无计划</span></div></div>
+      </article>
+    </section>
+    <section class="lab-pane plans-pane"><div class="pane-heading"><h2>自动注入计划</h2><span>撤销子单将停止整个所属计划</span></div><div class="plans-scroll"><table id="plans-table"><thead><tr><th>计划标识</th><th>模式</th><th>方向</th><th>总量</th><th>已成交</th><th>已挂单</th><th>待提交</th><th>已撤 / 停止</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="lab-flows">
+      <article class="lab-pane"><div class="pane-heading"><h2>逐笔撮合成交</h2><span>最近 200 笔 · 点详情穿透</span></div><div class="flow-scroll"><table id="trade-table"><thead><tr><th>成交时间</th><th>方向</th><th>成交价</th><th>数量</th><th>来源</th><th>明细</th></tr></thead><tbody></tbody></table></div></article>
+      <article class="lab-pane"><div class="pane-heading"><h2 class="buy-text">买方订单生命周期</h2><span>最近变更 200 单</span></div><div class="flow-scroll"><table id="buy-table"><thead><tr><th>申报时间 / 标识</th><th>价格</th><th>总量</th><th>成交</th><th>撤减</th><th>剩余</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table></div></article>
+      <article class="lab-pane"><div class="pane-heading"><h2 class="sell-text">卖方订单生命周期</h2><span>最近变更 200 单</span></div><div class="flow-scroll"><table id="sell-table"><thead><tr><th>申报时间 / 标识</th><th>价格</th><th>总量</th><th>成交</th><th>撤减</th><th>剩余</th><th>状态</th><th>操作</th></tr></thead><tbody></tbody></table></div></article>
+    </section>
+    <div class="footnote"><span>限价 / FIFO · 所有时间均为模拟市场时间 · 高亮表示本次更新发生变更</span><span>会话仅存于内存，闲置 30 分钟过期；刷新页面后需重新加载实验</span></div>
+  </main>
+  <dialog id="trade-detail"><div class="dialog-head"><h2>成交双边穿透</h2><button id="close-trade" aria-label="关闭成交详情">×</button></div><div id="trade-detail-content"></div></dialog>
+</body>
+</html>

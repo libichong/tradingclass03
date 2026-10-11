@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>逐流 · 市场数据工作台</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-icon">≋</span> 逐流 <span class="brand-sub">MARKET DATA</span></a>
+    <div class="header-links"><a href="/backtest">因子回测</a><a href="/replay">撮合实验室 →</a><span class="mode"><i></i> 本地数据 · 只读模式</span></div>
+  </header>
+  <main>
+    <section class="heading">
+      <div><div class="eyebrow">MARKET EXPLORER / 数据浏览</div><h1>每一笔，清晰可见<span>。</span></h1><p>从成交、盘口到委托，浏览原始市场微观数据。</p></div>
+      <button id="refresh" class="button secondary" type="button">↻ 刷新文件</button>
+    </section>
+    <section id="summary" class="summary" aria-label="数据概览"></section>
+    <section class="workspace">
+      <div class="workspace-head"><div class="tabs" role="tablist" aria-label="数据类型">
+        <button type="button" role="tab" data-kind="exe" aria-selected="true">逐笔成交 <span>EXECUTIONS</span></button>
+        <button type="button" role="tab" data-kind="snp" aria-selected="false">行情快照 <span>SNAPSHOTS</span></button>
+        <button type="button" role="tab" data-kind="ord" aria-selected="false">逐笔委托 <span>ORDERS</span></button>
+      </div><span class="source-tag">PARQUET</span></div>
+      <form id="filters" class="filters">
+        <label class="file-field">数据文件<select id="file" name="file" required aria-label="数据文件"></select></label>
+        <label>证券代码<input id="symbol" name="symbol" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="全部 / 如 601688"></label>
+        <label>开始时间<input id="start" name="start" type="time" step="0.001"></label>
+        <span class="range-separator">—</span>
+        <label>结束时间<input id="end" name="end" type="time" step="0.001"></label>
+        <button id="query" type="submit" class="button primary">查询数据 <span>→</span></button>
+        <button id="reset" type="button" class="button secondary">重置</button>
+      </form>
+      <div class="table-toolbar"><div><strong id="table-title">逐笔成交</strong><span id="result-count" class="muted"></span></div><label class="column-toggle"><input id="all-columns" type="checkbox"> 显示全部字段</label></div>
+      <div id="status" role="status" aria-live="polite" hidden></div>
+      <div id="table-wrap" class="table-wrap" tabindex="0" aria-label="市场数据表格，可横向滚动">
+        <table id="data-table"><thead></thead><tbody></tbody></table>
+        <div id="empty" class="empty" hidden><span>⌕</span><h3>没有匹配的数据</h3><p>请调整证券代码或时间范围后重新查询。</p></div>
+      </div>
+      <footer class="pagination"><span id="range-info">等待加载</span><div><label>每页 <select id="page-size"><option>50</option><option selected>100</option><option>200</option><option>500</option></select> 条</label><button id="prev" type="button" aria-label="上一页">‹</button><span id="page-info">1 / 1</span><button id="next" type="button" aria-label="下一页">›</button><form id="jump-form"><input id="jump-page" type="number" min="1" value="1" aria-label="跳转页码"><button type="submit">跳转</button></form></div></footer>
+    </section>
+    <div class="footnote"><span>按文件原始行序展示 · 时间格式 HH:MM:SS.sss · 价格最多显示 6 位小数</span><span>枚举与数量 / 金额单位保留源数据定义，不推断买卖方向</span></div>
+  </main>
+  <dialog id="detail"><div class="dialog-head"><div><div class="eyebrow">RECORD INSPECTOR</div><h2 id="detail-title">记录详情</h2></div><button id="close-detail" type="button" aria-label="关闭详情">×</button></div><p class="muted">原始字段值，不进行价格舍入或单位换算。</p><div id="depth"></div><div id="detail-fields"></div></dialog>
+</body>
+</html>

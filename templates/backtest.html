@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>逐流 · 因子研究</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='backtest.css') }}">
+  <script defer src="{{ url_for('static', filename='backtest.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='factor_analysis.js') }}"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-icon">≋</span> 逐流 <span class="brand-sub">FACTOR RESEARCH</span></a>
+    <nav class="header-links"><a href="/">数据浏览</a><a href="/replay">撮合实验室</a></nav>
+  </header>
+  <main class="research">
+    <section class="research-heading"><div><div class="eyebrow">INTRADAY FACTOR LAB / 日内因子研究</div><h1>从微观数据，到因子表现<span>。</span></h1><p>10 个公开代理公式 · 滞后信号 · 截面分组 · 双边扣费</p></div><span class="research-tag">单日样本 / 非实盘</span></section>
+    <div class="research-notice">图片仅包含因子名称，以下是可审阅的研究代理公式，并非原研报复现。A 股 T+1、融券、盘口成交约束未建模；日内换仓收益与多空曲线均不可直接视为可实现收益。</div>
+    <form id="backtest-form" class="research-controls">
+      <label>交易日<select id="bt-date" required></select></label>
+      <label>回看窗口 / 分钟<input id="bt-window" type="number" min="5" max="60" step="1" value="20" required></label>
+      <label>持有区间 / 分钟<input id="bt-holding" type="number" min="1" max="30" step="1" value="5" required></label>
+      <label>截面分组<select id="bt-groups"><option value="2">2 组</option><option value="3">3 组</option><option value="5" selected>5 组</option></select></label>
+      <label>策略方向<select id="bt-direction"><option value="high">做多高因子组</option><option value="low">做多低因子组</option></select></label>
+      <label>大单阈值 / 源金额<input id="bt-threshold" type="number" min="1" max="10000000000" value="200000" required></label>
+      <label>单边手续费 / bps<input id="bt-fee" type="number" min="0" max="100" step="0.1" value="3" required></label>
+      <label>单边滑点 / bps<input id="bt-slippage" type="number" min="0" max="100" step="0.1" value="2" required></label>
+      <button id="bt-run" class="button primary" type="submit">计算全部因子 →</button>
+    </form>
+    <div id="bt-status" role="status" aria-live="polite">正在读取数据目录…</div>
+    <section class="factor-picker"><label>当前观察因子<select id="bt-factor" aria-label="当前观察因子"></select></label><span id="bt-coverage">等待计算</span></section>
+    <div id="active-formula" class="active-formula"></div>
+    <section id="bt-metrics" class="bt-metrics" aria-label="回测指标"></section>
+    <section class="research-charts">
+      <article class="research-panel"><div class="panel-title"><h2>净值路径</h2><span>初始净值 1 · 扣除双边费用</span></div><div id="nav-legend" class="chart-legend"></div><svg id="nav-chart" viewBox="0 0 800 300" role="img" aria-label="策略、等权基准和多空净值曲线"></svg></article>
+      <article class="research-panel"><div class="panel-title"><h2>策略回撤</h2><span>持有期端点采样，非期间内最大回撤</span></div><svg id="dd-chart" viewBox="0 0 800 300" role="img" aria-label="策略净值回撤曲线"></svg></article>
+    </section>
+    <section class="research-panel all-factors"><div class="panel-title"><h2>十因子结果总览</h2><span>悬停 / 聚焦名称查看解释，点击切换；不同时段收益不可直接比较</span></div><div class="research-scroll"><table id="factor-results"><thead><tr><th>因子 / 代理口径</th><th>扣费收益率</th><th>最大回撤</th><th>期频夏普</th><th>平均 Rank IC</th><th>有效期数</th><th>有效时段</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="research-panel correlation-section">
+      <div class="panel-title"><h2>因子截面相关性</h2><span>同一信号时点 · 十因子共同完整样本 · 非收益时间序列相关</span></div>
+      <div class="analysis-controls">
+        <label>信号分钟<select id="analysis-minute" disabled><option value="">自动：尾盘最近共同有效时点</option></select></label>
+        <label>相关方法<select id="correlation-method"><option value="spearman">Spearman · 秩相关</option><option value="pearson">Pearson · 线性相关</option></select></label>
+        <span id="analysis-summary">等待计算</span>
+      </div>
+      <div id="analysis-status" role="status" aria-live="polite">计算回测后自动生成相关性分析。</div>
+      <div class="correlation-layout">
+        <div class="correlation-matrix-wrap"><table id="correlation-matrix" aria-label="十因子截面相关系数矩阵"><thead></thead><tbody></tbody></table><div class="correlation-scale"><span>−1 负相关</span><i></i><span>+1 正相关</span><small>颜色不代表盈利能力；— 表示无定义</small></div></div>
+        <aside class="correlation-sidebar"><h3>绝对相关最高的因子对</h3><div id="correlation-pairs"></div><h3>各因子单独有效样本</h3><div id="factor-availability"></div><p>矩阵统一取十因子的样本交集，不使用逐对不同样本。单因子有效数不等于矩阵样本数。</p></aside>
+      </div>
+      <ul id="analysis-warnings" class="analysis-warnings"></ul>
+    </section>
+    <section class="research-panel">
+      <div class="panel-title"><h2>逐股票交易特征</h2><span>与相关性同一时点；横向滚动查看全部特征，悬停表头查看定义</span></div>
+      <div class="analysis-controls"><label>证券代码<input id="feature-symbol" inputmode="numeric" maxlength="6" placeholder="全部 / 如 601688"></label><label class="sample-filter"><input id="features-common" type="checkbox">仅显示相关性共同样本</label><span id="feature-summary">等待计算</span></div>
+      <div class="research-scroll feature-scroll"><table id="trading-features"><thead></thead><tbody></tbody></table></div>
+      <details class="feature-definitions"><summary>交易特征计算口径</summary><div id="feature-definitions"></div></details>
+    </section>
+    <section class="research-charts group-section">
+      <article class="research-panel"><div class="panel-title"><h2>因子分组净值</h2><span>G1 最低 → G<span id="group-number">5</span> 最高；各组内等权</span></div><div id="group-legend" class="chart-legend"></div><svg id="group-chart" viewBox="0 0 800 300" role="img" aria-label="因子各分组净值"></svg></article>
+      <article class="research-panel"><div class="panel-title"><h2>分组统计</h2><span>相同有效期、相同费用口径</span></div><div class="research-scroll"><table id="group-results"><thead><tr><th>分组</th><th>收益率</th><th>最大回撤</th><th>期频夏普</th><th>胜率</th></tr></thead><tbody></tbody></table></div><p id="factor-diagnostics" class="panel-footnote"></p></article>
+    </section>
+    <section class="research-panel"><div class="panel-title"><h2>逐期信号与收益审计</h2><span>信号截止早于价格代理采样；没有重叠持仓</span></div><div class="research-scroll audit-scroll"><table id="period-results"><thead><tr><th>信号截止</th><th>建仓 → 平仓</th><th>有效股票</th><th>策略毛收益</th><th>策略净收益</th><th>基准净收益</th><th>Rank IC</th><th>策略组成员</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="research-panel"><div class="panel-title"><h2>最近一期因子截面</h2><span id="last-signal">—</span></div><div class="research-scroll values-scroll"><table id="value-results"><thead><tr><th>证券代码</th><th>因子值</th><th>分组</th><th>后续持有期毛收益（仅用于评价）</th></tr></thead><tbody></tbody></table></div></section>
+    <details class="research-panel definitions" open><summary>公开代理公式与数据定义</summary><div id="formula-list"></div><p>r 为快照最新价形成的 1 分钟收盘收益；窗口不使用未来值。金额 = Price×Volume，未核验供应商单位。BSFlag 66/83/0 = 主动买/主动卖/未知；未知计入总额，不计入方向净额。新增委托只取 OrderKind=65，FunctionCode 66/83 为买/卖。大单按每笔成交额判断，不按原始母单合并。</p></details>
+    <details class="research-panel definitions" open><summary>回测假设、指标定义与数据质量</summary>
+      <ul id="bt-warnings"></ul>
+      <p>每期使用上一完整分钟及更早数据排序，下一分钟第一条有效快照最新价作为买价代理，持有 H 分钟后用对应分钟第一条有效快照价格平仓。每期全额开平仓；不跨午休，不交易最后不足完整区间的时段。缺失成交价格时拒绝回测，不按未来价格可用性剔除股票。</p>
+      <p>G1 为最低因子组，最高组由分组数决定。相同值按证券代码排序；不同值不足分组数时整期不交易。基准为同一期全部有效证券等权组合，并扣除相同费用。累计相对收益 = 策略净值 / 基准净值 − 1。多空为 50% 高组 / 50% 低组、总敞口 1；低因子方向时对调，不含融券成本。</p>
+      <p>令 c = (单边手续费 + 单边滑点) / 10000。多头每期净收益 = (1+毛收益)×(1−c)/(1+c)−1。多空净收益 = 0.5×(多头毛收益−空头毛收益)−c×[2+0.5×(两腿毛收益之和)]。收益按期复利；期频夏普 = 均值 / 样本标准差（无风险利率 0）；不足两期或零方差显示“无定义”。最大回撤 = max(1−净值/此前峰值)，包含初始净值 1。</p>
+      <pre id="quality-info">等待计算</pre>
+    </details>
+  </main>
+</body>
+</html>
